@@ -1,44 +1,52 @@
 <style>
   :root {
-    --border-radius-lg: 12px;
-    --color-border-tertiary: #ccc;
     --color-background-secondary: #f9f9f9;
     --color-text-secondary: #666;
   }
+
+  /* Reseteamos el body para que no haya márgenes blancos */
+  body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: var(--color-background-secondary);
+    /* Evita que el celular haga scroll o pull-to-refresh al tocar la pantalla */
+    touch-action: none;
+  }
+
   #canvas-wrap {
     position: relative;
-    width: 100%;
-    height: 420px;
+    width: 100vw;
+    height: 100dvh; /* Se adapta dinámicamente al alto de cualquier pantalla */
     overflow: hidden;
-    border-radius: var(--border-radius-lg);
-    border: 0.5px solid var(--color-border-tertiary);
-    background: var(--color-background-secondary);
     cursor: default;
   }
+
   #c {
     display: block;
     width: 100%;
     height: 100%;
   }
+
   #hint {
     position: absolute;
-    bottom: 12px;
+    bottom: 24px;
     left: 0;
     right: 0;
     text-align: center;
-    font-size: 13px;
+    font-size: 14px;
+    font-family: sans-serif;
     color: var(--color-text-secondary);
     pointer-events: none;
     transition: opacity 0.8s;
   }
 </style>
-<h2 class="sr-only">
-  Bola negra brillante — haz clic para lanzarla o arrástrala
-</h2>
+
 <div id="canvas-wrap">
   <canvas id="c"></canvas>
   <div id="hint">Haz clic en la bola para lanzarla, o arrástrala 🎱</div>
 </div>
+
 <script>
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d");
@@ -55,7 +63,7 @@
 
   const R = 28;
   const GRAVITY = 0.52;
-  const FRICTION = 0.996; // Fricción baja para que ruede más
+  const FRICTION = 0.996;
   const BOUNCE = 0.55;
   const THREAD_LEN = 160;
 
@@ -218,21 +226,16 @@
       }
     }
 
-    // --- SOMBRA DINÁMICA EN EL SUELO ---
-    // Calculamos qué tan lejos está la bola del suelo
     const distToGround = H - (ball.y + R);
-    const maxShadowDist = 200; // Si sube más de 200px, la sombra desaparece
+    const maxShadowDist = 200;
 
     if (distToGround < maxShadowDist) {
-      // La opacidad va de 0.25 (en el suelo) a 0 (en el aire)
       const shadowAlpha = 0.25 * (1 - distToGround / maxShadowDist);
-      // La sombra se "esparce" (escala) al alejarse
       const shadowScale = 1 + distToGround / 100;
 
       ctx.save();
       ctx.globalAlpha = Math.max(0, shadowAlpha);
       ctx.beginPath();
-      // Dibujamos en la misma X que la bola, pero Y siempre está en H (el suelo)
       ctx.ellipse(
         ball.x,
         H,
@@ -247,7 +250,6 @@
       ctx.restore();
     }
 
-    // Dibujar el rastro (lo dejé como un efecto de velocidad)
     trail.push({ x: ball.x, y: ball.y });
     if (trail.length > THREAD_LEN) trail.shift();
 
@@ -261,8 +263,6 @@
       ctx.stroke();
     }
 
-    // --- DIBUJO DE LA BOLA LÚCIDA ---
-    // 1. Base negra sólida
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, R, 0, Math.PI * 2);
     ctx.fillStyle = "#111";
@@ -274,9 +274,7 @@
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // 2. Reflejo especular de luz (Gradiente)
     ctx.save();
-    // Creamos un brillo arriba a la izquierda del centro de la bola
     const grad = ctx.createRadialGradient(
       ball.x - R * 0.35,
       ball.y - R * 0.35,
@@ -285,7 +283,6 @@
       ball.y - R * 0.15,
       R * 0.8,
     );
-    // De blanco semitransparente a transparente
     grad.addColorStop(0, "rgba(255, 255, 255, 0.45)");
     grad.addColorStop(1, "rgba(255, 255, 255, 0)");
 
@@ -295,7 +292,6 @@
     ctx.fill();
     ctx.restore();
 
-    // Desenfoque de movimiento rápido
     const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
     if (speed > 2 && !dragging) {
       ctx.save();
