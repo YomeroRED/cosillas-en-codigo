@@ -1,0 +1,568 @@
+<style>
+  :root {
+    --color-background-secondary: #f9f9f9;
+    --color-text-secondary: #666;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: var(--color-background-secondary);
+    touch-action: none;
+  }
+
+  #canvas-wrap {
+    position: relative;
+    width: 100vw;
+    height: 100dvh;
+    overflow: hidden;
+    cursor: default;
+  }
+
+  #c {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Marcador de puntos acumulativo */
+  #scoreboard {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    font-family: sans-serif;
+    font-size: 22px;
+    font-weight: bold;
+    color: #111;
+    pointer-events: none;
+    user-select: none;
+    background: rgba(255, 255, 255, 0.75);
+    padding: 8px 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    z-index: 10;
+  }
+
+  #hint {
+    position: absolute;
+    bottom: 24px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 14px;
+    font-family: sans-serif;
+    color: var(--color-text-secondary);
+    pointer-events: none;
+    transition: opacity 0.8s;
+  }
+</style>
+
+<div id="canvas-wrap">
+  <div id="scoreboard">Puntos: <span id="score">0</span></div>
+
+  <canvas id="c"></canvas>
+  <div id="hint">Haz clic en la bola para lanzarla, o arrástrala 🎱</div>
+</div>
+
+<script>
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  const wrap = document.getElementById("canvas-wrap");
+  const hint = document.getElementById("hint");
+  const scoreEl = document.getElementById("score");
+
+  let W, H;
+  function resize() {
+    W = canvas.width = wrap.clientWidth;
+    H = canvas.height = wrap.clientHeight;
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  const R = 28;
+  const GRAVITY = 0.52;
+  const FRICTION = 0.996;
+  const BOUNCE = 0.55;
+  const THREAD_LEN = 160;
+
+  // Configuración de los puntos negros estáticos del fondo
+  const TOTAL_DOTS = 12;
+  let blackDots = [];
+
+  // Puntuación y combos
+  let score = 0;
+  let comboCount = 0;
+
+  let ball = { x: 0, y: 0, vx: 1.2, vy: 0 };
+  let dragging = false;
+  let mouse = { x: 0, y: 0 };
+  let prevMouse = { x: 0, y: 0 };
+  let dragOffset = { x: 0, y: 0 };
+  let trail = [];
+  let hintGone = false;
+  let time = 0;
+
+  let clickStartX = 0;
+  let clickStartY = 0;
+
+  // --- VARIABLES DE LA ANIMACIÓN DEL GATO ---
+  let pawState = "HIDDEN"; // Estados: HIDDEN, APPEARING, DRAGGING, RETRACTING
+  let pawX = 0;
+  let pawY = 0;
+  let idleTime = 0;
+
+  // Origen de la pata (fuera de la pantalla abajo a la izquierda para mantener los 45°)
+  let originX = -100;
+  let originY = 0;
+
+  let pawProgress = 0; // Controla interpolación de extensión/retracción
+  let dragProgress = 0; // Controla interpolación de arrastre de la bola
+  let catInitialBallX = 0;
+  let catInitialBallY = 0;
+
+  function init() {
+    ball.x = W / 2;
+    ball.y = H / 3;
+    originY = H + 100; // Ajuste dinámico según el alto de la pantalla basado en el nuevo sandbox
+
+    blackDots = [];
+    const baseRadius = Math.min(W, H) * 0.013;
+    const minSeparation = baseRadius * 4;
+
+    for (let i = 0; i < TOTAL_DOTS; i++) {
+      let dot;
+      let valid = false;
+      let attempts = 0;
+
+      const isBig = Math.random() < 0.3;
+      const radiusMultiplier = isBig
+        ? 2.0 + Math.random() * 0.8
+        : 0.9 + Math.random() * 0.3;
+      const radius = baseRadius * radiusMultiplier;
+
+      while (!valid && attempts < 150) {
+        attempts++;
+        const posX = Math.random() * (W - radius * 4) + radius * 2;
+        const posY = Math.random() * (H - radius * 4) + radius * 2;
+
+        valid = true;
+
+        for (let j = 0; j < blackDots.length; j++) {
+          const other = blackDots[j];
+          const dx = posX - other.x;
+          const dy = posY - other.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < radius + other.r + minSeparation) {
+            valid = false;
+            break;
+          }
+        }
+
+        if (valid) {
+          dot = { x: posX, y: posY, r: radius, isHit: false };
+        }
+      }
+      if (dot) blackDots.push(dot);
+    }
+  }
+
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    const s = e.touches ? e.touches[0] : e;
+    return {
+      x: (s.clientX - r.left) * (W / r.width),
+      y: (s.clientY - r.top) * (H / r.height),
+    };
+  }
+
+  function hitBall(p) {
+    const dx = p.x - ball.x,
+      dy = p.y - ball.y;
+    return Math.sqrt(dx * dx + dy * dy) < R + 10;
+  }
+
+  function randomLaunch() {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 10 + Math.random() * 12;
+    ball.vx = Math.cos(angle) * speed;
+    ball.vy = Math.sin(angle) * speed - 5;
+  }
+
+  // Si el usuario toca la pantalla, asustamos al gato y le devolvemos el control al jugador
+  function interruptCat() {
+    if (pawState !== "HIDDEN") {
+      pawState = "HIDDEN";
+      idleTime = 0;
+      ball.vx = 0;
+      ball.vy = 0;
+    }
+  }
+
+  canvas.addEventListener("mousedown", (e) => {
+    const p = getPos(e);
+    if (hitBall(p)) {
+      interruptCat();
+      dragging = true;
+      comboCount = 0; // Reset combo
+      dragOffset = { x: p.x - ball.x, y: p.y - ball.y };
+      prevMouse = { x: p.x, y: p.y };
+      mouse = { x: p.x, y: p.y };
+      clickStartX = p.x;
+      clickStartY = p.y;
+      if (!hintGone) {
+        hint.style.opacity = "0";
+        hintGone = true;
+      }
+    }
+  });
+
+  canvas.addEventListener("mousemove", (e) => {
+    prevMouse = { x: mouse.x, y: mouse.y };
+    const p = getPos(e);
+    mouse = { x: p.x, y: p.y };
+    if (dragging) {
+      ball.x = mouse.x - dragOffset.x;
+      ball.y = mouse.y - dragOffset.y;
+      ball.vx = (mouse.x - prevMouse.x) * 0.9;
+      ball.vy = (mouse.y - prevMouse.y) * 0.9;
+    }
+  });
+
+  canvas.addEventListener("mouseup", (e) => {
+    if (dragging) {
+      const p = getPos(e);
+      const dx = p.x - clickStartX;
+      const dy = p.y - clickStartY;
+      if (Math.sqrt(dx * dx + dy * dy) < 5) {
+        comboCount = 0;
+        randomLaunch();
+      }
+    }
+    dragging = false;
+  });
+
+  canvas.addEventListener(
+    "touchstart",
+    (e) => {
+      const p = getPos(e);
+      if (hitBall(p)) {
+        interruptCat();
+        dragging = true;
+        comboCount = 0;
+        dragOffset = { x: p.x - ball.x, y: p.y - ball.y };
+        prevMouse = { x: p.x, y: p.y };
+        mouse = { x: p.x, y: p.y };
+        clickStartX = p.x;
+        clickStartY = p.y;
+        if (!hintGone) {
+          hint.style.opacity = "0";
+          hintGone = true;
+        }
+      }
+      e.preventDefault();
+    },
+    { passive: false },
+  );
+
+  canvas.addEventListener(
+    "touchmove",
+    (e) => {
+      prevMouse = { x: mouse.x, y: mouse.y };
+      const p = getPos(e);
+      mouse = { x: p.x, y: p.y };
+      if (dragging) {
+        ball.x = mouse.x - dragOffset.x;
+        ball.y = mouse.y - dragOffset.y;
+        ball.vx = (mouse.x - prevMouse.x) * 0.9;
+        ball.vy = (mouse.y - prevMouse.y) * 0.9;
+      }
+      e.preventDefault();
+    },
+    { passive: false },
+  );
+
+  canvas.addEventListener("touchend", (e) => {
+    if (dragging) {
+      const dx = mouse.x - clickStartX;
+      const dy = mouse.y - clickStartY;
+      if (Math.sqrt(dx * dx + dy * dy) < 5) {
+        comboCount = 0;
+        randomLaunch();
+      }
+    }
+    dragging = false;
+  });
+
+  // --- NUEVA FUNCIÓN DE DIBUJO INTEGRADA DESDE EL SANDBOX (ESTILO DORSO CON CALCETÍN BLANCO) ---
+  function drawCatPaw(x, y, angle) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+
+    // 1. Brazo del gato (Negro)
+    ctx.fillStyle = "#000000";
+    ctx.beginPath();
+    ctx.arc(0, -20, 42, Math.PI, 0);
+    // 800 de longitud para evitar cortes visuales desde la esquina inferior
+    ctx.lineTo(42, 800);
+    ctx.lineTo(-42, 800);
+    ctx.closePath();
+    ctx.fill();
+
+    // 2. Calcetín blanco
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(0, -20, 42, Math.PI, 0);
+    ctx.lineTo(42, 50);
+    ctx.quadraticCurveTo(0, 75, -42, 50); // Borde inferior curvado
+    ctx.closePath();
+    ctx.fill();
+
+    // 3. Líneas de los dedos en Gris
+    ctx.strokeStyle = "#8a8a8a";
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = "round";
+
+    // Línea de separación izquierda (dedo 1 y 2)
+    ctx.beginPath();
+    ctx.moveTo(-20, -57);
+    ctx.quadraticCurveTo(-15, -35, -12, -8);
+    ctx.stroke();
+
+    // Línea de separación central (dedo 2 y 3)
+    ctx.beginPath();
+    ctx.moveTo(0, -62);
+    ctx.quadraticCurveTo(0, -35, 0, -3);
+    ctx.stroke();
+
+    // Línea de separación derecha (dedo 3 y 4)
+    ctx.beginPath();
+    ctx.moveTo(20, -57);
+    ctx.quadraticCurveTo(15, -35, 12, -8);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function loop() {
+    requestAnimationFrame(loop);
+    ctx.clearRect(0, 0, W, H);
+    time++;
+
+    // Dibujar los puntos negros del fondo
+    blackDots.forEach((dot) => {
+      ctx.beginPath();
+      ctx.arc(dot.x, dot.y, dot.r, 0, Math.PI * 2);
+      if (dot.isHit) {
+        ctx.fillStyle = "rgba(30, 30, 30, 0.12)";
+      } else {
+        ctx.fillStyle = "#1e1e1e";
+      }
+      ctx.fill();
+    });
+
+    const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+    const onGround = ball.y + R >= H - 2;
+
+    // --- LÓGICA MECÁNICA DE LA PATITA ---
+    if (!dragging && pawState === "HIDDEN") {
+      // Física clásica de rebotes
+      ball.vy += GRAVITY;
+      ball.vx *= FRICTION;
+      ball.vy *= FRICTION;
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+
+      if (ball.y + R >= H) {
+        ball.y = H - R;
+        ball.vy *= -BOUNCE;
+        ball.vx *= 0.92;
+      }
+      if (ball.y - R <= 0) {
+        ball.y = R;
+        ball.vy *= -BOUNCE;
+      }
+      if (ball.x + R >= W) {
+        ball.x = W - R;
+        ball.vx *= -BOUNCE;
+      }
+      if (ball.x - R <= 0) {
+        ball.x = R;
+        ball.vx *= -BOUNCE;
+      }
+
+      // Detector de colisión con las esferas de puntos en caída libre
+      blackDots.forEach((dot) => {
+        if (!dot.isHit) {
+          const dx = ball.x - dot.x;
+          const dy = ball.y - dot.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < R + dot.r) {
+            dot.isHit = true;
+            let pointsToAdd = comboCount === 0 ? 10 : comboCount * 25;
+            score += pointsToAdd;
+            comboCount++;
+            scoreEl.textContent = score;
+          }
+        }
+      });
+
+      // Si la pelota descansa en el suelo lejos de la esquina de recolección
+      if (speed < 0.2 && onGround && ball.x > R * 3) {
+        idleTime++;
+        if (idleTime > 100) {
+          pawState = "APPEARING";
+          pawProgress = 0;
+          dragProgress = 0;
+          catInitialBallX = ball.x;
+          catInitialBallY = ball.y;
+        }
+      } else {
+        idleTime = 0;
+      }
+    }
+    // Control cinemático cuando el Gato toma control
+    else if (pawState !== "HIDDEN") {
+      ball.vx = 0;
+      ball.vy = 0; // Congelar físicas automáticas
+
+      if (pawState === "APPEARING") {
+        pawProgress += 0.035; // Velocidad de salida
+        if (pawProgress >= 1) {
+          pawProgress = 1;
+          pawState = "DRAGGING";
+        }
+        // Desplazamiento lineal desde el rincón izquierdo hasta la bola
+        pawX = originX + (catInitialBallX - originX) * pawProgress;
+        pawY = originY + (catInitialBallY - originY) * pawProgress;
+      } else if (pawState === "DRAGGING") {
+        dragProgress += 0.015; // Velocidad de arrastre (más pesado/lento)
+        if (dragProgress >= 1) {
+          dragProgress = 1;
+          pawState = "RETRACTING";
+          pawProgress = 1;
+        }
+        // El objetivo final en la esquina inferior izquierda
+        let targetX = R * 1.5;
+        let targetY = H - R;
+
+        ball.x = catInitialBallX + (targetX - catInitialBallX) * dragProgress;
+        ball.y = catInitialBallY + (targetY - catInitialBallY) * dragProgress;
+        pawX = ball.x;
+        pawY = ball.y;
+      } else if (pawState === "RETRACTING") {
+        pawProgress -= 0.04; // Se esconde rápido
+        if (pawProgress <= 0) {
+          pawProgress = 0;
+          pawState = "HIDDEN";
+          idleTime = 0;
+        }
+        let currentTargetX = R * 1.5;
+        let currentTargetY = H - R;
+        pawX = originX + (currentTargetX - originX) * pawProgress;
+        pawY = originY + (currentTargetY - originY) * pawProgress;
+      }
+    }
+
+    // --- SOMBRA DE LA BOLA ---
+    const distToGround = H - (ball.y + R);
+    const maxShadowDist = 200;
+
+    if (distToGround < maxShadowDist) {
+      const shadowAlpha = 0.25 * (1 - distToGround / maxShadowDist);
+      const shadowScale = 1 + distToGround / 100;
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, shadowAlpha);
+      ctx.beginPath();
+      ctx.ellipse(
+        ball.x,
+        H,
+        R * 1.05 * shadowScale,
+        R * 0.25 * shadowScale,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fillStyle = "#000";
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // --- RASTRO ---
+    trail.push({ x: ball.x, y: ball.y });
+    if (trail.length > THREAD_LEN) trail.shift();
+
+    for (let i = 1; i < trail.length; i++) {
+      const a = (i / trail.length) * 0.55;
+      ctx.beginPath();
+      ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
+      ctx.lineTo(trail[i].x, trail[i].y);
+      ctx.strokeStyle = `rgba(30,30,30,${a * 0.25})`;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+
+    // --- DIBUJO DE LA BOLA ---
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, R, 0, Math.PI * 2);
+    ctx.fillStyle = "#111";
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, R, 0, Math.PI * 2);
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.save();
+    const grad = ctx.createRadialGradient(
+      ball.x - R * 0.35,
+      ball.y - R * 0.35,
+      R * 0.05,
+      ball.x - R * 0.15,
+      ball.y - R * 0.15,
+      R * 0.8,
+    );
+    grad.addColorStop(0, "rgba(255, 255, 255, 0.45)");
+    grad.addColorStop(1, "rgba(255, 255, 255, 0)");
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, R, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+
+    if (speed > 2 && !dragging && pawState === "HIDDEN") {
+      ctx.save();
+      ctx.globalAlpha = Math.min(speed * 0.035, 0.15);
+      ctx.beginPath();
+      ctx.arc(
+        ball.x - ball.vx * 1.8,
+        ball.y - ball.vy * 1.8,
+        R * 0.88,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fillStyle = "#111";
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // --- RENDERIZADO DINÁMICO DE LA NUEVA PATA DE GATO (45°) ---
+    if (pawState !== "HIDDEN") {
+      // Calculamos la dirección angular en tiempo de ejecución de la pata desde su origen
+      let dx = pawX - originX;
+      let dy = pawY - originY;
+      // Compensamos con +PI/2 para alinear el eje vertical del canvas local a la trayectoria diagonal
+      let angle = Math.atan2(dy, dx) + Math.PI / 2;
+
+      drawCatPaw(pawX, pawY, angle);
+    }
+  }
+
+  init();
+  loop();
+</script>
