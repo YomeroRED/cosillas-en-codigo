@@ -1,14 +1,60 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Cosillas en código</title>
-  </head>
-  <body>
-    <h1>Mis proyectos</h1>
-    <ul>
-      <li><a href="/bolita_con_fisicas.html">Bolita con físicas</a></li>
-      <li><a href="/juego_de_puntos.html">Juego de puntos</a></li>
-    </ul>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <title>Sistema de apoyo a la decision Multicriterio</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <h1>Sistema de apoyo a la decision Multicriterio Aires Acondicionados Metodo SAW</h1>
+
+  <h2>Pesos de cada criterio</h2>
+  <p>Escribe un numero entre 0 y 1 para cada criterio. La suma deberia dar 1.</p>
+
+  <table id="tablaPesos" border="1" cellpadding="6">
+    <tr>
+      <th>Criterio</th>
+      <th>Tipo</th>
+      <th>Peso</th>
+    </tr>
+  </table>
+
+  <p>Suma actual de pesos: <span id="sumaPesos">1.00</span></p>
+
+  <button id="btnCalcular">Calcular recomendacion</button>
+
+  <label>
+    Orden:
+    <select id="ordenSelect">
+      <option value="desc">Mejor a peor</option>
+      <option value="asc">Peor a mejor</option>
+    </select>
+  </label>
+
+
+  <h2>Productos</h2>
+
+  <button id="btnMostrarForm">Agregar producto nuevo</button>
+
+  <div id="formNuevoProducto" style="display:none;">
+    <h3>Nuevo aire Acondicionado</h3>
+    <table id="tablaFormulario" border="1" cellpadding="6">
+    </table>
+    <button id="btnGuardarProducto">Guardar producto</button>
+    <button id="btnCancelarProducto">Cancelar</button>
+    <p id="mensajeError" style="color:red; display:none;">Falta llenar algun campo o el numero no es valido.</p>
+  </div>
+
+  <div id="listaProductos">
+  </div>
+
+
+  <h2>Resultado ranking</h2>
+  <div id="resultadoRanking">
+    <p><i>No se ha calculado nada. Presiona el boton Calcular recomendacion</i></p>
+  </div>
+
+  <script src="script.js"></script>
+</body>
 </html>

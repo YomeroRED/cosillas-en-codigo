@@ -1,0 +1,76 @@
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  margin: 30px;
+  background-color: #ffffff;
+  color: #000000;
+}
+
+h1 {
+  color: #000000;
+}
+
+h2 {
+  color: #000000;
+  margin-top: 30px;
+}
+
+table {
+  border-collapse: collapse;
+  margin-bottom: 15px;
+}
+
+th, td {
+  padding: 6px 10px;
+}
+
+th {
+  background-color: #d9e6f5;
+}
+
+input[type="number"], input[type="text"] {
+  width: 100px;
+}
+
+button {
+  background-color: #21792e;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  margin: 5px 5px 5px 0;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #065f2e;
+}
+
+#formNuevoProducto {
+  border: 1px solid #999999;
+  padding: 10px;
+  margin-bottom: 15px;
+  background-color: #f2f2f2;
+}
+
+.fila-producto td {
+  vertical-align: top;
+}
+
+.puesto-1 {
+  background-color: #fff2b2;
+}
+
+.puesto-2 {
+  background-color: #e6e6e6;
+}
+
+.puesto-3 {
+  background-color: #f0d9b5;
+}
+
+.btn-eliminar {
+  background-color: #a83232;
+}
+
+.btn-eliminar:hover {
+  background-color: #7a2323;
+}
