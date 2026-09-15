@@ -14,16 +14,20 @@ var criterios = [
 ];
 
 // Lista de productos (alternativas), tomada del ejemplo de la tarea 3
+// "imagen" guarda la RUTA o URL de la foto de cada equipo (ver notas al final del archivo)
 var productos = [
-  { id: "A1", nombre: "A1 - LG Dual Inverter 12000 BTU",   precio: 450, btu: 12000, seer: 20, ruido: 19, garantia: 10, control: 9 },
-  { id: "A2", nombre: "A2 - Samsung WindFree 12000 BTU",   precio: 500, btu: 12000, seer: 21, ruido: 20, garantia: 7,  control: 9 },
-  { id: "A3", nombre: "A3 - Midea Xtreme Save 12000 BTU",  precio: 380, btu: 12000, seer: 18, ruido: 22, garantia: 5,  control: 6 },
-  { id: "A4", nombre: "A4 - Carrier 18000 BTU",            precio: 600, btu: 18000, seer: 16, ruido: 24, garantia: 5,  control: 5 },
-  { id: "A5", nombre: "A5 - Daikin Inverter 12000 BTU",    precio: 550, btu: 12000, seer: 22, ruido: 18, garantia: 10, control: 8 },
-  { id: "A6", nombre: "A6 - Hisense 9000 BTU (economico)", precio: 300, btu: 9000,  seer: 15, ruido: 26, garantia: 3,  control: 4 },
-  { id: "A7", nombre: "A7 - Mirage 24000 BTU (semi-ind)",  precio: 750, btu: 24000, seer: 14, ruido: 30, garantia: 5,  control: 5 },
-  { id: "A8", nombre: "A8 - Panasonic Inverter Nanoe",     precio: 520, btu: 12000, seer: 19, ruido: 21, garantia: 8,  control: 7 }
+  { id: "A1", nombre: "A1 - LG Dual Inverter 12000 BTU",   imagen: "img/A1.jpg", precio: 450, btu: 12000, seer: 20, ruido: 19, garantia: 10, control: 9 },
+  { id: "A2", nombre: "A2 - Samsung WindFree 12000 BTU",   imagen: "img/A2.jpg", precio: 500, btu: 12000, seer: 21, ruido: 20, garantia: 7,  control: 9 },
+  { id: "A3", nombre: "A3 - Midea Xtreme Save 12000 BTU",  imagen: "img/A3.jpg", precio: 380, btu: 12000, seer: 18, ruido: 22, garantia: 5,  control: 6 },
+  { id: "A4", nombre: "A4 - Carrier 18000 BTU",            imagen: "img/A4.jpg", precio: 600, btu: 18000, seer: 16, ruido: 24, garantia: 5,  control: 5 },
+  { id: "A5", nombre: "A5 - Daikin Inverter 12000 BTU",    imagen: "img/A5.jpg", precio: 550, btu: 12000, seer: 22, ruido: 18, garantia: 10, control: 8 },
+  { id: "A6", nombre: "A6 - Hisense 9000 BTU (economico)", imagen: "img/A6.jpg", precio: 300, btu: 9000,  seer: 15, ruido: 26, garantia: 3,  control: 4 },
+  { id: "A7", nombre: "A7 - Mirage 24000 BTU (semi-ind)",  imagen: "img/A7.jpg", precio: 750, btu: 24000, seer: 14, ruido: 30, garantia: 5,  control: 5 },
+  { id: "A8", nombre: "A8 - Panasonic Inverter Nanoe",     imagen: "img/A8.jpg", precio: 520, btu: 12000, seer: 19, ruido: 21, garantia: 8,  control: 7 }
 ];
+
+// Imagen que se usa cuando un producto no tiene foto propia o la ruta no existe todavia
+var IMAGEN_GENERICA = "img/generico.png";
 
 // contador para poner id a los productos nuevos que agregue el usuario
 var contadorNuevos = 0;
@@ -104,8 +108,10 @@ function pintarProductos() {
 
   for (var p = 0; p < productos.length; p++) {
     var prod = productos[p];
+    var rutaImagen = prod.imagen ? prod.imagen : IMAGEN_GENERICA;
     html += '<tr class="fila-producto">';
-    html += "<td>" + prod.nombre + "</td>";
+    html += '<td>' + prod.nombre +
+      '<br><img class="foto-producto" src="' + rutaImagen + '" alt="' + prod.nombre + '" onerror="this.src=\'' + IMAGEN_GENERICA + '\'"></td>';
     for (var k = 0; k < criterios.length; k++) {
       var c = criterios[k];
       html += "<td>" + prod[c.clave] + " " + c.unidad + "</td>";
@@ -147,6 +153,7 @@ function pintarFormularioNuevoProducto() {
   var html = "";
 
   html += "<tr><td>Nombre del producto</td><td><input type='text' id='campo-nombre'></td></tr>";
+  html += "<tr><td>Imagen (URL o ruta, ej. img/A9.jpg)</td><td><input type='text' id='campo-imagen' placeholder='img/nombre.jpg'></td></tr>";
 
   for (var i = 0; i < criterios.length; i++) {
     var c = criterios[i];
@@ -159,7 +166,8 @@ function pintarFormularioNuevoProducto() {
 
 function guardarNuevoProducto() {
   var nombre = document.getElementById("campo-nombre").value.trim();
-  var datosNuevos = { nombre: nombre };
+  var imagen = document.getElementById("campo-imagen").value.trim();
+  var datosNuevos = { nombre: nombre, imagen: imagen.length > 0 ? imagen : IMAGEN_GENERICA };
   var todoValido = nombre.length > 0;
 
   for (var i = 0; i < criterios.length; i++) {
@@ -327,10 +335,12 @@ function mostrarRanking() {
     if (res.puesto === 1) clasePuesto = "puesto-1";
     if (res.puesto === 2) clasePuesto = "puesto-2";
     if (res.puesto === 3) clasePuesto = "puesto-3";
+    var rutaImagenRes = res.datos.imagen ? res.datos.imagen : IMAGEN_GENERICA;
 
     html += "<tr class='" + clasePuesto + "'>";
     html += "<td>" + res.puesto + (res.empatado ? " (empate)" : "") + "</td>";
-    html += "<td>" + res.nombre + "</td>";
+    html += '<td>' + res.nombre +
+      '<br><img class="foto-producto" src="' + rutaImagenRes + '" alt="' + res.nombre + '" onerror="this.src=\'' + IMAGEN_GENERICA + '\'"></td>';
 
     for (var c = 0; c < criterios.length; c++) {
       var clave = criterios[c].clave;
