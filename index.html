@@ -7,7 +7,7 @@
 </head>
 <body>
 
-  <h1>Sistema de apoyo a la decision Multicriterio Aires Acondicionados Metodo SAW</h1>
+  <h1>Sistema de apoyo a la decision Multicriterio Aires Acondicionados</h1>
 
   <h2>Pesos de cada criterio</h2>
   <p>Escribe un numero entre 0 y 1 para cada criterio. La suma deberia dar 1.</p>
@@ -21,17 +21,6 @@
   </table>
 
   <p>Suma actual de pesos: <span id="sumaPesos">1.00</span></p>
-
-  <button id="btnCalcular">Calcular recomendacion</button>
-
-  <label>
-    Orden:
-    <select id="ordenSelect">
-      <option value="desc">Mejor a peor</option>
-      <option value="asc">Peor a mejor</option>
-    </select>
-  </label>
-
 
   <h2>Productos</h2>
 
@@ -49,6 +38,27 @@
   <div id="listaProductos">
   </div>
 
+  <h2>Metodo de calculo</h2>
+  <div class="segmented" role="radiogroup" aria-label="Selector de metodo">
+    <input type="radio" name="mode" id="opt1" value="saw" checked>
+    <label for="opt1">SAW</label>
+
+    <input type="radio" name="mode" id="opt2" value="topsis">
+    <label for="opt2">TOPSIS</label>
+
+    <input type="radio" name="mode" id="opt3" value="ambos">
+    <label for="opt3">Ambos</label>
+  </div>
+
+  <button id="btnCalcular">Calcular recomendacion</button>
+
+  <label>
+    Orden:
+    <select id="ordenSelect">
+      <option value="desc">Mejor a peor</option>
+      <option value="asc">Peor a mejor</option>
+    </select>
+  </label>
 
   <h2>Resultado ranking</h2>
   <div id="resultadoRanking">
