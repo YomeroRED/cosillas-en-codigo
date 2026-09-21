@@ -13,7 +13,7 @@ var criterios = [
   { clave: "control",  nombre: "Funciones inteligentes", unidad: "/10",  tipo: "beneficio", peso: 0.10 }
 ];
 
-// Lista de productos (alternativas), tomada del ejemplo de la tarea 3
+// Lista de productos (alternativas)
 // "imagen" guarda la RUTA o URL de la foto de cada equipo (ver notas al final del archivo)
 var productos = [
   { id: "A1", nombre: "A1 - LG Dual Inverter 12000 BTU",   imagen: "img/A1.jpg", precio: 450, btu: 12000, seer: 20, ruido: 19, garantia: 10, control: 9 },
