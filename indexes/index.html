@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IDDFS vs búsqueda bidireccional</title>
+<style>
+:root{--bg:#f3f5f2;--fg:#1c2421;--muted:#5b6862;--card:#fff;--line:#c9d1cc;--seen:#d9e6df;--acc:#5b3fa0;--f:#1f6fb2;--b:#d4741a;--ok:#1f8a4c;--on:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121816;--fg:#e6ece8;--muted:#9aa8a1;--card:#1b2420;--line:#3a4741;--seen:#2a3a33;--acc:#a58bf0;--f:#5aa8e8;--b:#f0a05a;--ok:#4cc882;--on:#10161a}}
+:root[data-theme="dark"]{--bg:#121816;--fg:#e6ece8;--muted:#9aa8a1;--card:#1b2420;--line:#3a4741;--seen:#2a3a33;--acc:#a58bf0;--f:#5aa8e8;--b:#f0a05a;--ok:#4cc882;--on:#10161a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 Georgia,"Times New Roman",serif}
+main{max-width:1040px;margin:0 auto;padding:16px 16px 40px}
+h1{font-size:1.7rem;margin:.3em 0 .1em;letter-spacing:-.01em}
+h2{font-size:1.15rem;margin:0 0 .3em}
+p.lead{color:var(--muted);margin:0 0 16px;max-width:68ch}
+.seg{display:flex;width:max-content;max-width:100%;margin:0 auto;border:1px solid var(--line);border-radius:99px;background:var(--card);padding:3px}
+.seg button{border:0;background:none;border-radius:99px;padding:7px 18px}
+.seg button[aria-pressed=true],.tool[aria-pressed=true]{background:var(--acc);color:var(--on)}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.ctl label,.hint{font:14px system-ui,sans-serif;color:var(--muted)}
+select,button{font:14px system-ui,sans-serif;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+button.main{background:var(--acc);color:var(--on);border-color:var(--acc)}
+:is(button,select,input):focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+input[type=range]{flex:1;min-width:140px;accent-color:var(--acc)}
+.step{font:14px system-ui,sans-serif;color:var(--muted);min-width:110px;text-align:right}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+body:not([data-view=both]) .grid{grid-template-columns:minmax(0,680px);justify-content:center}
+body[data-view=i] .panel.b,body[data-view=b] .panel.i{display:none}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.panel.i{border-top:4px solid var(--acc)}.panel.b{border-top:4px solid var(--f)}
+svg{width:100%;height:auto;display:block}svg.edit{touch-action:none}
+.ed{stroke:var(--line);stroke-width:2}
+.ed.p{stroke:var(--acc);stroke-width:4}.ed.f{stroke:var(--f);stroke-width:3}.ed.bk{stroke:var(--b);stroke-width:3}.ed.fin{stroke:var(--ok);stroke-width:5}
+.hit{stroke:transparent;stroke-width:16;cursor:pointer}
+.nd circle{fill:var(--card);stroke:var(--line);stroke-width:2}
+.nd text{font:600 13px system-ui,sans-serif;fill:var(--fg);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.edit .nd{cursor:grab}
+.nd.seen circle{fill:var(--seen)}
+.nd.path circle{fill:var(--acc);stroke:var(--acc)}.nd.path text{fill:var(--on)}
+.nd.cur circle{stroke:var(--fg);stroke-width:4}
+.nd.cut circle{stroke:var(--b);stroke-width:4}
+.nd.vf circle{fill:var(--f);stroke:var(--f)}.nd.vf text{fill:var(--on)}
+.nd.vb circle{fill:var(--b);stroke:var(--b)}.nd.vb text{fill:var(--on)}
+.nd.fr circle{stroke-dasharray:4 3;stroke-width:3}
+.nd.fr.ff circle{stroke:var(--f)}.nd.fr.fb circle{stroke:var(--b)}
+.nd.meet circle{fill:var(--ok);stroke:var(--ok)}.nd.meet text{fill:var(--on)}
+.nd.sel circle{stroke:var(--fg);stroke-dasharray:3 2;stroke-width:4}
+.nd .tag{font:11px system-ui,sans-serif;fill:var(--muted)}
+.msg{font:14px/1.4 system-ui,sans-serif;min-height:2.8em;margin:6px 0 4px}
+.chips{display:flex;flex-wrap:wrap;gap:4px;font:13px system-ui,sans-serif;color:var(--muted)}
+.chip{padding:1px 8px;border:1px solid var(--line);border-radius:99px}
+.chip.on{background:var(--acc);color:var(--on);border-color:var(--acc)}
+.leg{font:12px system-ui,sans-serif;color:var(--muted);margin-top:6px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 3px 0 8px}
+section.cmp{margin-top:18px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.bar{margin:8px 0;font:14px system-ui,sans-serif}
+.bar div.t{height:14px;background:var(--seen);border-radius:7px;overflow:hidden;margin-top:3px}
+.bar i{display:block;height:100%;width:0;transition:width .2s}
+table{border-collapse:collapse;width:100%;font:14px system-ui,sans-serif;margin-top:10px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.wrap{overflow-x:auto}
+</style>
+</head>
+<body data-view="both">
+<main>
+<div class="seg" role="group" aria-label="Qué algoritmo ver">
+  <button data-v="i" aria-pressed="false">IDDFS</button>
+  <button data-v="both" aria-pressed="true">Ambos</button>
+  <button data-v="b" aria-pressed="false">Bidireccional</button>
+</div>
+<h1>IDDFS frente a búsqueda bidireccional</h1>
+<p class="lead">Elige un grafo de ejemplo o dibuja el tuyo, y avanza paso a paso para ver cómo explora cada algoritmo hasta encontrar el camino.</p>
+
+<div class="ctl">
+  <label>Grafo <select id="pr">
+    <option value="peq">Pequeño (12 nodos)</option><option value="g4">Cuadrícula 4×4 (16)</option><option value="g5">Cuadrícula 5×5 (25)</option>
+    <option value="arb">Árbol binario (15)</option><option value="ani">Anillo con atajos (20)</option><option value="vac">En blanco (2 nodos)</option></select></label>
+  <label>Inicio <select id="s"></select></label>
+  <label>Meta <select id="g"></select></label>
+  <button id="edt" aria-pressed="false">Modo edición</button>
+</div>
+<div class="ctl" id="ed" hidden>
+  <button class="tool" data-t="move" aria-pressed="true">Mover</button>
+  <button class="tool" data-t="node" aria-pressed="false">Añadir nodo</button>
+  <button class="tool" data-t="edge" aria-pressed="false">Unir nodos</button>
+  <button class="tool" data-t="del" aria-pressed="false">Borrar</button>
+  <span class="hint" id="hint"></span>
+</div>
+<div class="ctl">
+  <button id="prev">Anterior</button>
+  <button id="play" class="main">Reproducir</button>
+  <button id="next">Siguiente</button>
+  <button id="skip" title="Salta al inicio de la siguiente iteración de IDDFS">Sig. límite</button>
+  <button id="reset">Reiniciar</button>
+  <label>Velocidad <select id="sp"><option value="900">Lenta</option><option value="450" selected>Media</option><option value="150">Rápida</option><option value="30">Muy rápida</option></select></label>
+  <input type="range" id="sl" min="0" max="0" value="0" aria-label="Paso">
+  <span class="step" id="stl"></span>
+</div>
+
+<div class="grid">
+  <div class="panel i">
+    <h2>IDDFS (profundización iterativa)</h2>
+    <svg id="g1" viewBox="0 0 500 320" role="img" aria-label="Grafo con IDDFS"></svg>
+    <div class="msg" id="m1"></div>
+    <div class="chips" id="c1"></div>
+    <div class="leg"><span class="sw" style="background:var(--acc)"></span>camino actual<span class="sw" style="background:var(--seen)"></span>visitado en esta iteración<span class="sw" style="border:3px solid var(--b)"></span>corte por límite</div>
+  </div>
+  <div class="panel b">
+    <h2>Búsqueda bidireccional (BFS desde ambos extremos)</h2>
+    <svg id="g2" viewBox="0 0 500 320" role="img" aria-label="Grafo con búsqueda bidireccional"></svg>
+    <div class="msg" id="m2"></div>
+    <div class="chips" id="c2"></div>
+    <div class="leg"><span class="sw" style="background:var(--f)"></span>desde el inicio<span class="sw" style="background:var(--b)"></span>desde la meta<span class="sw" style="border:2px dashed var(--fg)"></span>frontera<span class="sw" style="background:var(--ok)"></span>encuentro</div>
+  </div>
+</div>
+
+<section class="cmp">
+  <h2>Comparación en este paso</h2>
+  <div class="bar"><span id="l1"></span><div class="t"><i id="b1" style="background:var(--acc)"></i></div></div>
+  <div class="bar"><span id="l2"></span><div class="t"><i id="b2" style="background:var(--f)"></i></div></div>
+  <div class="wrap"><table>
+    <tr><th></th><th>IDDFS</th><th>Bidireccional</th></tr>
+    <tr><td>Tiempo</td><td>O(b<sup>d</sup>): repite niveles, pero el último domina</td><td>O(b<sup>d/2</sup>): dos búsquedas más pequeñas</td></tr>
+    <tr><td>Memoria</td><td>O(b·d): solo guarda el camino actual</td><td>O(b<sup>d/2</sup>): guarda ambas fronteras</td></tr>
+    <tr><td>Camino óptimo</td><td>Sí (aristas sin costo)</td><td>Sí (con BFS en ambos lados)</td></tr>
+    <tr><td>Requisitos</td><td>Ninguno especial</td><td>Meta conocida y movimientos reversibles</td></tr>
+  </table></div>
+  <p class="leg" style="font-size:13px">Este IDDFS solo evita ciclos dentro del camino actual, por eso en cuadrículas revisita muchos nodos. Si pasa de 20 000 visitas, la simulación se corta.</p>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id),key=(a,b)=>a<b?a+'|'+b:b+'|'+a,LT="ABCDEFGHIJKLMNOPQRSTUVWXYZ",lt=i=>LT[i];
+function grid(r,c){const n={},e=[];for(let j=0;j<r;j++)for(let k=0;k<c;k++){const id=lt(j*c+k);n[id]=[50+k*400/(c-1),30+j*260/(r-1)];if(k)e.push([lt(j*c+k-1),id]);if(j)e.push([lt((j-1)*c+k),id])}return{n,e,s:'A',g:lt(r*c-1)}}
+function tree(){const n={},e=[];for(let i=0;i<15;i++){const l=Math.floor(Math.log2(i+1)),k=i+1-2**l;n[lt(i)]=[(k+.5)*500/2**l,35+l*85];if(i)e.push([lt((i-1)>>1),lt(i)])}return{n,e,s:'H',g:'O'}}
+function ring(){const n={},e=[];for(let i=0;i<20;i++){const a=i/20*2*Math.PI-Math.PI/2;n[lt(i)]=[250+205*Math.cos(a),160+130*Math.sin(a)];e.push([lt(i),lt((i+1)%20)])}[[0,7],[3,12],[5,15],[9,17],[2,10]].forEach(([a,b])=>e.push([lt(a),lt(b)]));return{n,e,s:'A',g:lt(10)}}
+const PRE={
+ peq:()=>({n:{A:[50,160],B:[140,70],C:[140,250],D:[240,40],E:[240,130],F:[240,200],G:[240,290],H:[340,70],I:[340,160],J:[340,250],K:[450,110],L:[450,220]},e:"AB AC BD BE CF CG DH EI EF FJ GJ HK IK IL JL".split(" ").map(x=>[x[0],x[1]]),s:'A',g:'L'}),
+ g4:()=>grid(4,4),g5:()=>grid(5,5),arb:tree,ani:ring,
+ vac:()=>({n:{A:[100,160],B:[400,160]},e:[],s:'A',g:'B'})};
+
+let N={},E=[],S='A',G='B',adj={},I1=[],I2=[],i=0,timer=null,edit=false,tool='move',pend=null,drag=null;
+function mkAdj(){adj={};Object.keys(N).forEach(k=>adj[k]=[]);E.forEach(([a,b])=>{adj[a].push(b);adj[b].push(a)});Object.values(adj).forEach(a=>a.sort())}
+function reach(s,g){const v=new Set([s]),q=[s];while(q.length){const n=q.shift();for(const m of adj[n])if(!v.has(m)){v.add(m);q.push(m)}}return v.has(g)}
+
+function iddfs(s,g){
+  const st=[],LIM=20000;let exp=0,trunc=false;
+  if(!reach(s,g)) return [{L:0,path:[],seen:[],cur:null,exp:0,kind:'none',msg:`No existe camino entre ${s} y ${g}.`}];
+  for(let L=0;L<Object.keys(N).length&&!trunc;L++){
+    const seen=new Set();let found=false;
+    st.push({L,path:[],seen:[],cur:null,exp,kind:'iter',msg:`Nueva iteración: límite de profundidad = ${L}. Se reinicia desde ${s}.`});
+    const dls=(n,path)=>{
+      if(exp>=LIM){trunc=true;return true}
+      exp++;seen.add(n);const p=[...path,n],d=p.length-1,base={L,path:p,seen:[...seen],cur:n,exp};
+      if(n===g){st.push({...base,kind:'goal',msg:`Visita ${n} (prof. ${d}): ¡es la meta! Camino: ${p.join(' → ')}.`});found=true;return true}
+      if(d===L){st.push({...base,kind:'cut',msg:`Visita ${n} (prof. ${d}): se alcanzó el límite ${L}, no se expande.`});return false}
+      st.push({...base,kind:'visit',msg:`Visita ${n} (prof. ${d}): se expande a ${adj[n].filter(m=>!p.includes(m)).join(', ')||'nadie (sin vecinos nuevos)'}.`});
+      for(const m of adj[n]) if(!p.includes(m)&&dls(m,p)) return true;
+      return false;
+    };
+    dls(s,[]);
+    if(found) break;
+  }
+  if(trunc) st.push({...st[st.length-1],kind:'trunc',msg:'Se detuvo al llegar a 20 000 visitas: IDDFS revisita demasiados nodos en este grafo.'});
+  return st;
+}
+
+function bidi(s,g){
+  const st=[];let qF=[s],qB=[g],pF={[s]:null},pB={[g]:null},exp=0,turn=0,meet=s===g?s:null,path=null;
+  const snap=(msg,cur,fin)=>st.push({F:{...pF},B:{...pB},qF:[...qF],qB:[...qB],cur,meet,exp,path:fin||null,msg});
+  const build=()=>{const a=[];for(let n=meet;n!=null;n=pF[n])a.unshift(n);for(let n=pB[meet];n!=null;n=pB[n])a.push(n);return a};
+  snap(`Se crean dos fronteras: una en ${s} (azul) y otra en ${g} (naranja).`,null);
+  if(meet){path=[s];snap('Inicio y meta coinciden.',null,path)}
+  while(!meet&&(qF.length||qB.length)){
+    const fw=turn++%2===0,q=fw?qF:qB;if(!q.length)continue;
+    const n=q.shift();exp++;const P=fw?pF:pB,O=fw?pB:pF,nuevos=[];
+    for(const m of adj[n]){ if(m in P)continue;P[m]=n;q.push(m);nuevos.push(m);if(m in O){meet=m;break} }
+    if(meet){path=build();snap(`Expande ${n} desde ${fw?'el inicio':'la meta'}: ${meet} ya había sido alcanzado por el otro lado. ¡Se encuentran! Camino: ${path.join(' → ')}.`,n,path)}
+    else snap(`Expande ${n} desde ${fw?'el inicio':'la meta'}: agrega ${nuevos.join(', ')||'nada nuevo'} a su frontera.`,n);
+  }
+  if(!meet) snap(`Las fronteras se agotaron sin encontrarse: no existe camino.`,null);
+  return st;
+}
+
+function stop(){clearInterval(timer);timer=null;$('play').textContent='Reproducir'}
+function fillSel(){['s','g'].forEach(id=>{$(id).innerHTML=Object.keys(N).map(k=>`<option>${k}</option>`).join('')});$('s').value=S;$('g').value=G}
+function build(){mkAdj();I1=iddfs(S,G);I2=bidi(S,G);i=0;stop();$('sl').max=Math.max(I1.length,I2.length)-1;render()}
+function load(k){const p=PRE[k]();N=p.n;E=p.e;S=p.s;G=p.g;pend=null;fillSel();build()}
+
+function draw(svg,ec,nc){
+  let h=E.map(([a,b])=>`<line class="ed ${ec[key(a,b)]||''}" x1="${N[a][0]}" y1="${N[a][1]}" x2="${N[b][0]}" y2="${N[b][1]}"/>`).join('');
+  if(edit)h+=E.map(([a,b])=>`<line class="hit" data-e="${a}|${b}" x1="${N[a][0]}" y1="${N[a][1]}" x2="${N[b][0]}" y2="${N[b][1]}"/>`).join('');
+  h+=Object.keys(N).map(n=>{const[x,y]=N[n],t=n===S&&n===G?'inicio/meta':n===S?'inicio':n===G?'meta':'';
+    return `<g class="nd ${nc(n)}${pend===n?' sel':''}" data-n="${n}"><circle cx="${x}" cy="${y}" r="16"/><text x="${x}" y="${y}">${n}</text>${t?`<text class="tag" x="${x}" y="${y-24}">${t}</text>`:''}</g>`}).join('');
+  svg.innerHTML=h;svg.classList.toggle('edit',edit);
+}
+
+function render(){
+  const a=I1[Math.min(i,I1.length-1)],b=I2[Math.min(i,I2.length-1)],A=I1[I1.length-1],B=I2[I2.length-1];
+  const ec1={};for(let k=1;k<a.path.length;k++)ec1[key(a.path[k-1],a.path[k])]='p';
+  draw($('g1'),ec1,n=>(a.seen.includes(n)?'seen ':'')+(a.path.includes(n)?'path ':'')+(a.cur===n?'cur ':'')+(a.kind==='cut'&&a.cur===n?'cut ':''));
+  $('m1').textContent=a.msg;
+  $('c1').innerHTML='Límite: '+Array.from({length:A.L+1},(_,l)=>`<span class="chip ${l===a.L?'on':''}">${l}</span>`).join('')+` <span>Camino: ${a.path.join(' → ')||'—'}</span>`;
+  const ec2={};
+  for(const[P,c]of[[b.F,'f'],[b.B,'bk']])for(const n in P)if(P[n]!=null)ec2[key(n,P[n])]=c;
+  if(b.path)for(let k=1;k<b.path.length;k++)ec2[key(b.path[k-1],b.path[k])]='fin';
+  draw($('g2'),ec2,n=>{let c='';const inF=n in b.F,inB=n in b.B;
+    if(n===b.meet)c+='meet ';else if(inF&&!inB)c+='vf ';else if(inB&&!inF)c+='vb ';
+    if(b.qF.includes(n))c+='fr ff ';if(b.qB.includes(n))c+='fr fb ';
+    if(b.cur===n&&n!==b.meet)c+='cur ';return c});
+  $('m2').textContent=b.msg;
+  $('c2').innerHTML=`<span>Frontera inicio: ${b.qF.join(', ')||'—'}</span><span>· Frontera meta: ${b.qB.join(', ')||'—'}</span>`;
+  const mx=Math.max(A.exp,B.exp,1),len=(ok,p)=>ok?`camino de ${p.length-1} aristas`:'sin camino completo';
+  $('b1').style.width=a.exp/mx*100+'%';$('b2').style.width=b.exp/mx*100+'%';
+  $('l1').textContent=`IDDFS: ${a.exp} visitas de nodos (total al final: ${A.exp}, ${len(A.kind==='goal',A.path)})`;
+  $('l2').textContent=`Bidireccional: ${b.exp} nodos expandidos (total al final: ${B.exp}, ${len(!!B.path,B.path||[])})`;
+  $('sl').value=i;$('stl').textContent=`Paso ${i} / ${$('sl').max}`;
+}
+
+const step=d=>{const mx=+$('sl').max;i=Math.max(0,Math.min(mx,i+d));render();if(i>=mx)stop()};
+$('next').onclick=()=>{stop();step(1)};
+$('prev').onclick=()=>{stop();step(-1)};
+$('reset').onclick=()=>{stop();i=0;render()};
+$('skip').onclick=()=>{stop();const j=I1.findIndex((s,k)=>k>i&&s.kind==='iter');i=j<0?+$('sl').max:j;render()};
+$('sl').oninput=e=>{stop();i=+e.target.value;render()};
+$('play').onclick=()=>{if(timer){stop();return}if(i>=+$('sl').max){i=0;render()}$('play').textContent='Pausa';timer=setInterval(()=>step(1),+$('sp').value)};
+$('sp').onchange=()=>{if(timer){stop();$('play').click()}};
+$('s').onchange=e=>{S=e.target.value;build()};
+$('g').onchange=e=>{G=e.target.value;build()};
+$('pr').onchange=e=>load(e.target.value);
+
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{document.body.dataset.view=b.dataset.v;document.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+const HINTS={move:'Arrastra los nodos para reubicarlos.',node:'Toca un espacio vacío para añadir un nodo.',edge:'Toca dos nodos para unirlos (o separarlos si ya están unidos).',del:'Toca un nodo o una arista para eliminarlo.'};
+function setTool(t){tool=t;pend=null;document.querySelectorAll('.tool').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===t));$('hint').textContent=HINTS[t];render()}
+document.querySelectorAll('.tool').forEach(b=>b.onclick=()=>setTool(b.dataset.t));
+$('edt').onclick=()=>{edit=!edit;$('edt').setAttribute('aria-pressed',edit);$('ed').hidden=!edit;setTool('move')};
+
+function newId(){for(const k of LT)if(!(k in N))return k;let c=27;while(String(c) in N)c++;return String(c)}
+function pt(svg,e){const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(svg.getScreenCTM().inverse());return[Math.max(20,Math.min(480,q.x)),Math.max(24,Math.min(300,q.y))]}
+['g1','g2'].forEach(id=>{const svg=$(id);
+  svg.addEventListener('pointerdown',e=>{if(!edit)return;
+    const nd=e.target.closest('[data-n]'),ed=e.target.closest('[data-e]'),n=nd&&nd.dataset.n;
+    if(tool==='move'&&nd){drag=n;svg.setPointerCapture(e.pointerId)}
+    else if(tool==='node'&&!nd){N[newId()]=pt(svg,e);build()}
+    else if(tool==='edge'&&nd){
+      if(!pend){pend=n;render();return}
+      if(pend!==n){const k=E.findIndex(([a,b])=>key(a,b)===key(pend,n));k<0?E.push([pend,n]):E.splice(k,1)}
+      pend=null;build()}
+    else if(tool==='del'){
+      if(nd&&Object.keys(N).length>2){delete N[n];E=E.filter(([a,b])=>a!==n&&b!==n);const ks=Object.keys(N);if(!(S in N))S=ks[0];if(!(G in N))G=ks[ks.length-1];fillSel();build()}
+      else if(ed){E=E.filter(([a,b])=>key(a,b)!==key(...ed.dataset.e.split('|')));build()}}
+  });
+  svg.addEventListener('pointermove',e=>{if(drag){N[drag]=pt(svg,e);render()}});
+  svg.addEventListener('pointerup',()=>{drag=null});
+});
+load('peq');
+</script>
+</body>
+</html>
